@@ -12,21 +12,44 @@ trigger:
     include:
     - "*"
 jobs:
-  - job: Linux
+  - job: macOS
     pool:
-      vmImage: ubuntu-16.04
+      vmImage: macOS-10.14
     strategy:
       matrix:
         node_12.x:
           node_version: 12.x
     steps:
+      - task: NodeTool@0
+        inputs:
+          versionSpec: $(node_version)
+        displayName: Install Node.js
+      - task: CacheBeta@0
+        inputs:
+          key: cache | $(Agent.OS) | yarn.lock
+          path: $(AZURE_CACHE_FOLDER)
+          cacheHitVar: CACHE_RESTORED
+        displayName: Cache Yarn packages
       - bash: |
-          sudo chown root:root /
-          sudo apt-get update && sudo apt-get install -y snapd
-          sudo snap install snapcraft --classic
-          echo -n "${SNAP_LOGIN}" | base64 -i -d > snap_login
-          cat snap_login
-          snapcraft login --with snap_login
-        displayName: Setup snapcraft
+          mkdir -p "$YARN_CACHE_FOLDER"
+          tar -xzf "$AZURE_CACHE_FOLDER/yarn-cache.tar.gz" -C /
+        displayName: "Unpack cache"
+        condition: eq(variables.CACHE_RESTORED, 'true')
+      - script: make deps
+        displayName: Install dependencies
+      - script: make lint
+        displayName: Lint
+      - script: make test
+        displayName: Run tests
+      - script: make build
+        displayName: Build
         env:
-          SNAP_LOGIN: $(SNAP_LOGIN)
+          APPLEID: $(APPLEID)
+          APPLEIDPASS: $(APPLEIDPASS)
+          CSC_LINK: $(CSC_LINK)
+          CSC_KEY_PASSWORD: $(CSC_KEY_PASSWORD)
+          GH_TOKEN: $(GH_TOKEN)
+      - bash: |
+          mkdir -p "$AZURE_CACHE_FOLDER"
+          tar -czf "$AZURE_CACHE_FOLDER/yarn-cache.tar.gz" "$YARN_CACHE_FOLDER"
+        displayName: Pack cache
