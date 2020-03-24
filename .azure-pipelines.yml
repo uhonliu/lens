@@ -25,6 +25,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y snapd
           sudo snap install snapcraft --classic
           echo -n "${SNAP_LOGIN}" | base64 -d > snap_login
+          cat snap_login
           snapcraft login --with snap_login
         displayName: Setup snapcraft
         env:
